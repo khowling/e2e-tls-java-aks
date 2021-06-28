@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openjdk-demo
+  labels:
+    app: openjdk-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: openjdk-demo
+  template:
+    metadata:
+      labels:
+        app: openjdk-demo
+    spec:
+      containers:
+        - name: openjdk-demo
+          image: {{ACRNAME}}.azurecr.io/openjdk-demo:0.0.1
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          volumeMounts:
+            - name: tls-cert
+              mountPath: "/cert"
+              readOnly: true
+          ports:
+            - containerPort: 8080
+          imagePullPolicy: Always
+      volumes:
+        - name: tls-cert
+          secret:
+            secretName: openjdk-demo-tls
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openjdk-demo-service
+  labels:
+    app: openjdk-demo
+spec:
+  selector:
+    app: openjdk-demo
+  ports:
+    - name: https
+      protocol: TCP
+      port: 8443
+      targetPort: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: openjdk-demo-ingress
+  labels:
+    app: openjdk-demo
+  annotations:
+    kubernetes.io/ingress.class: azure/application-gateway
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    kubernetes.io/tls-acme: "true"
+    cert-manager.io/acme-challenge-type: http01
+    appgw.ingress.kubernetes.io/ssl-redirect: "true"
+    appgw.ingress.kubernetes.io/backend-protocol: "https"
+    appgw.ingress.kubernetes.io/backend-hostname: "openjdk-demo-service"
+    appgw.ingress.kubernetes.io/appgw-trusted-root-certificate: "backend-tls"
+spec:
+  tls:
+    - hosts:
+        - openjdk-demo.{{DNSZONE}}
+      secretName: tls-secret
+  rules:
+    - host: openjdk-demo.{{DNSZONE}}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: openjdk-demo-service
+                port:
+                  name: https
