@@ -10,10 +10,8 @@ This repo demostrates deploying an example "Hello World" Java Spring Boot web ap
 
 ## Provisioning a cluster
 
-Please use the ```AKS helper``` to provision your cluster, keep the default options of
+Please use the [AKS helper](https://azure.github.io/Aks-Construction) to provision your cluster, keep the default options of
   * ___I want a managed environment___
-  
-      and
   * ___Cluster with additional security controls___
 
 Then, go into the ___Addon Details___ tab, and select the following options, providing all the require information
