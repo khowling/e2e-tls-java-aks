@@ -29,7 +29,8 @@ This will create the full environment with everything configured inclduing AKS C
 
 ___NOTE___: Please remember to run the script on the ___Post Configuration___ tag to complete the deployment.
 
-
+You can check the pods with the following command `kubectl get po -A | grep "external-dns\|csi-"`
+![get pods check](screengrab_checkpods.png)
 
 
 ## Generate self signed PKCS12 backend cert
