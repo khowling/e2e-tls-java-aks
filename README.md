@@ -27,7 +27,7 @@ Then, go into the ___Addon Details___ tab, and select the following options, pro
 
 This will create the full environment with everything configured inclduing AKS Cluster with ACR, AGIC, cert-manager & external-dns.
 
-___NOTE___: Please relember to run the script on the ___Post Configuration___ tag to complete the deployment.
+___NOTE___: Please remember to run the script on the ___Post Configuration___ tag to complete the deployment.
 
 
 
