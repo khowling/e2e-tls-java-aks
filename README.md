@@ -8,6 +8,10 @@ This repo demostrates deploying an example "Hello World" Java Spring Boot web ap
 3. Compiling and running the App locally
 4. Deploying the app to AKS
 
+## Prerequisites
+
+The KeyVault Secrets Provider is currently a `preview` feature, please enable it on your subscription by following [this guide](https://docs.microsoft.com/en-us/azure/aks/csi-secrets-store-driver#register-the-aks-azurekeyvaultsecretsprovider-preview-feature).
+
 ## Provisioning a cluster
 
 Please use the [AKS helper](https://azure.github.io/Aks-Construction) to provision your cluster, keep the default options of
