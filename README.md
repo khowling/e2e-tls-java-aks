@@ -49,7 +49,8 @@ openssl pkcs12 -export -in cacert.pem -inkey cakey.pem -out identity.p12 -name "
 Create Secret
 
 ```
-kubectl create secret generic openjdk-demo-tls --from-file=identity.p12=./identity.p12
+export KEY_STORE_PASSWD=<your p12 keystore password>
+kubectl create secret generic openjdk-demo-tls  --from-literal=key-store-password=${KEY_STORE_PASSWD} --from-file=identity.p12=./identity.p12
 ```
 
 
@@ -97,6 +98,7 @@ When you use a bind mount, a file or directory on the host machine is mounted in
 docker run -d \
   -it \
   -p 8080:8080 \
+  --env KEY_STORE_PASSWD=${KEY_STORE_PASSWD} \
   --name openjdk-demo \
   --mount type=bind,source="$(pwd)"/identity.p12,target=/cert/identity.p12,readonly  \
   ${ACRNAME}.azurecr.io/openjdk-demo:0.0.1
@@ -107,8 +109,8 @@ docker run -d \
   Upload to ACR
 
 ```
- az acr login -n  ${ACRNAME}
- docker push ${ACRNAME}.azurecr.io/openjdk-demo:0.0.1
+az acr login -n  ${ACRNAME}
+docker push ${ACRNAME}.azurecr.io/openjdk-demo:0.0.1
 ```
 
 In the ```deployment.yml``` file replace the following values:
@@ -123,5 +125,5 @@ Deploy to AKS
  kubectl apply -f ./deployment.yml
 ```  
 
-Your new webapp should be accessable on ```https://openjdk-demo.{{DNSZONE}}```
+Then, after 3-4 minutes (while the dns and certificates are generated), your new webapp should be accessable on ```https://openjdk-demo.{{DNSZONE}}```
 

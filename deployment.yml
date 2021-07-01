@@ -18,10 +18,11 @@ spec:
         - name: openjdk-demo
           image: {{ACRNAME}}.azurecr.io/openjdk-demo:0.0.1
           env:
-            - name: POD_NAME
+            - name: KEY_STORE_PASSWD
               valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
+                secretKeyRef:
+                  name: openjdk-demo-tls
+                  key: key-store-password
           volumeMounts:
             - name: tls-cert
               mountPath: "/cert"
