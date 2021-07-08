@@ -11,56 +11,53 @@ This repo demostrates deploying an example "Hello World" Java Spring Boot web ap
 ## Provisioning a cluster
 
 Please use the [AKS helper](https://azure.github.io/Aks-Construction) to provision your cluster, keep the default options of
-  * ___I want a managed environment___
-  * ___Cluster with additional security controls___
+  * __I want a managed environment__
+  * __Cluster with additional security controls__
 
-Then, go into the ___Addon Details___ tab, and select the following options, providing all the require information
-  * ___Create FQDN URLs for your applications using external-dns___
+Then, go into the __Addon Details__ tab, and select the following options, providing all the require information
+  * __Create FQDN URLs for your applications using external-dns__
+  * __Automatically Issue Certificates for HTTPS using cert-manager (with Lets Encrypt - requires email)__
 
-     and
-  * ___Automatically Issue Certificates for HTTPS using cert-manager (with Lets Encrypt - requires email)___
+
+__NOTE:__ If you want to store your certs in KeyVault (recommended), please also select the follwo option from the __Addon Details__ tab:
+  * __Store Kubernetes Secrets in Azure Keyvault, using AKS Managed Identity__
 
 
 This will create the full environment with everything configured inclduing AKS Cluster with ACR, AGIC, cert-manager & external-dns.
 
-___NOTE___: Please relember to run the script on the ___Post Configuration___ tag to complete the deployment.
+___NOTE___: Please relember to run the script on the __Post Configuration__ tag to complete the deployment.
 
 
 
 
 ## Generate self signed PKCS12 backend cert
 
-
-
-___NOTE___: The CN you provide the certificate needs to match the Ingress annotation : "appgw.ingress.kubernetes.io/backend-hostname" currently ___"openjdk-demo-service"___
+__NOTE__: The CN you provide the certificate needs to match the Ingress annotation : "appgw.ingress.kubernetes.io/backend-hostname" currently ___"openjdk-demo-service"___
 
 
 ```
 # Create a private key and public certificate 
 openssl req -newkey rsa:2048 -x509 -keyout cakey.pem -out cacert.pem -days 3650 
 
-#create a JKS keystore
+# Create a JKS keystore
 openssl pkcs12 -export -in cacert.pem -inkey cakey.pem -out identity.pfx 
-```
 
-## Create the secret in AKS to hold the backend certificate
-
-Record your key store passwd for the following commands:
-```
+# Record your key store passwd for the following commands:
 export KEY_STORE_PASSWD=<your pfx keystore password>
 ```
 
-
 __NOTE:__ If you are using the [CSI Secret Store Driver](https://docs.microsoft.com/en-us/azure/aks/csi-secrets-store-driver) addon, you can ensure the secret is stored in an [Azure KeyVault](https://azure.microsoft.com/en-gb/services/key-vault/). Create Your Secret like this:
 
-### Option (A) Using CSI Secret & KeyVault
+## Option (A) Using CSI Secret & KeyVault (recommended)
 
 Add Secret and Certificate to the vault
 ```
 export KVNAME=kv-azk8s56xy
 
+## Create Key store password in KeyVault as secret
 az keyvault secret set --name key-store-password --vault-name $KVNAME  --value=${KEY_STORE_PASSWD}
 
+## Import Cert into keyvault
 ## Cannot mount as binary :( (objectEncoding only supported for objectType: secret)
 ## https://github.com/Azure/secrets-store-csi-driver-provider-azure/issues/138#issuecomment-874909741
 az keyvault certificate import --vault-name $KVNAME --name openjdk-demo-service --password $KEY_STORE_PASSWD --file ./identity.pfx
@@ -119,7 +116,7 @@ spec:
 " | kubectl apply -f -
 ```
 
-## Upload backend cert to AppGw
+### Upload backend cert to AppGw
 
 This step is required if your backend cert is not a CA-signed cert, or a CA known to AppGw: https://azure.github.io/application-gateway-kubernetes-ingress/tutorials/tutorial.e2e-ssl/
 
@@ -152,7 +149,7 @@ az network application-gateway root-cert create \
 ```
 
 
-### Option (B) Using Kubernetes Secrets
+## Option (B) Using Kubernetes Secrets
 
 Create Secret
 
@@ -161,7 +158,7 @@ kubectl create secret generic openjdk-demo-cert  --from-literal=key-store-passwo
 ```
 
 
-## Upload backend cert to AppGw
+### Upload backend cert to AppGw
 
 This step is required if your backend cert is not a CA-signed cert, or a CA known to AppGw: https://azure.github.io/application-gateway-kubernetes-ingress/tutorials/tutorial.e2e-ssl/
 
@@ -178,6 +175,8 @@ az network application-gateway root-cert create \
     --name backend-tls \
     --cert-file cacert.crt
 ```
+
+
 
 ## Build / Run Java App
 
