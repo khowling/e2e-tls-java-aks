@@ -14,6 +14,13 @@ spec:
       labels:
         app: openjdk-demo
     spec:
+      volumes:
+        - name: openjdk-demo-cert-mount
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "azure-{{KVNAME}}"
       containers:
         - name: openjdk-demo
           image: {{ACRNAME}}.azurecr.io/openjdk-demo:0.0.1
@@ -25,7 +32,7 @@ spec:
             - name: KEY_STORE_PASSWD
               valueFrom:
                 secretKeyRef:
-                  name:  openjdk-demo-cert
+                  name: openjdk-demo-cert
                   key: key-store-password
           volumeMounts:
             - name: openjdk-demo-cert-mount
@@ -41,10 +48,6 @@ spec:
             limits:
               memory: "512Mi"
               cpu: "1"
-      volumes:
-        - name: openjdk-demo-cert-mount
-          secret:
-            secretName:  openjdk-demo-cert
 ---
 apiVersion: v1
 kind: Service
@@ -75,7 +78,7 @@ metadata:
     appgw.ingress.kubernetes.io/ssl-redirect: "true"
     appgw.ingress.kubernetes.io/backend-protocol: "https"
     appgw.ingress.kubernetes.io/backend-hostname: "openjdk-demo-service"
-    appgw.ingress.kubernetes.io/appgw-trusted-root-certificate: "backend-tls"
+    appgw.ingress.kubernetes.io/appgw-trusted-root-certificate: "openjdk-demo-service"
 spec:
   tls:
     - hosts:
