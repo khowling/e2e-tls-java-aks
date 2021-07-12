@@ -84,7 +84,7 @@ Set ```ACRNAME``` to the container registry that was created by the wizzard
 
 ```
 ### Create a deployable jar file
-mvn package
+SSL_ENABLED=false ./mvnw package
 
 ### Build the image locally
 docker build -t ${ACRNAME}.azurecr.io/openjdk-demo:0.0.1 .
