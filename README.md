@@ -8,6 +8,10 @@ This repo demostrates deploying an example "Hello World" Java Spring Boot web ap
 3. Compiling and running the App locally
 4. Deploying the app to AKS
 
+## Prerequisites
+
+The KeyVault Secrets Provider is currently a `preview` feature, please enable it on your subscription by following [this guide](https://docs.microsoft.com/en-us/azure/aks/csi-secrets-store-driver#register-the-aks-azurekeyvaultsecretsprovider-preview-feature).
+
 ## Provisioning a cluster
 
 Please use the [AKS helper](https://azure.github.io/Aks-Construction) to provision your cluster, keep the default options of
@@ -23,9 +27,10 @@ Then, go into the ___Addon Details___ tab, and select the following options, pro
 
 This will create the full environment with everything configured inclduing AKS Cluster with ACR, AGIC, cert-manager & external-dns.
 
-___NOTE___: Please relember to run the script on the ___Post Configuration___ tag to complete the deployment.
+___NOTE___: Please remember to run the script on the ___Post Configuration___ tag to complete the deployment.
 
-
+You can check the pods with the following command `kubectl get po -A | grep "external-dns\|csi-"`
+![get pods check](screengrab_checkpods.png)
 
 
 ## Generate self signed PKCS12 backend cert
