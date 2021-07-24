@@ -1,39 +1,42 @@
 
-# End-2-End TLS with Azure Kubernetes Service and Application Gateway Ingress Controller
+# End-2-End TLS with Azure Kubernetes Service and Application Gateway Ingress Controller & CSI Sercret
 
-This repo demostrates deploying an example "Hello World" Java Spring Boot web app into a AKS clsuter, securly exposing it to the web using end-to-end TLS.  The following instructions will walk you though
+This repo demostrates deploying an example "Hello World" Java Spring Boot web app into a AKS clsuter, securly exposing it to the web using end-to-end TLS.
 
-1. Creating the AKS Cluster with ACR, AGIC, cert-manager & external-dns
+This example uses the Azure Kubernetes managed WAF ingress __Applicaiton Gateway__, and the [CSI Secret Store Driver](https://docs.microsoft.com/en-us/azure/aks/csi-secrets-store-driver) addon, to store the certificates in [Azure KeyVault](https://azure.microsoft.com/en-gb/services/key-vault/). 
+
+The following instructions will walk you though
+
+1. Creating the AKS Cluster with ACR (Azure Container Registry), AGIC addon (Application Gateway Ingress Controller), CSI Secret addon, AKV (Azure KeyVault), cert-manager for frontend certificate generation & external-dns for public DNS.
 2. Generating a Self-signed backend certificate & uploading into a Kubernetes secret
 3. Compiling and running the App locally
 4. Deploying the app to AKS
 
 ## Provisioning a cluster
 
-Please use the [AKS helper](https://azure.github.io/Aks-Construction) to provision your cluster, keep the default options of
-  * __I want a managed environment__
-  * __Cluster with additional security controls__
+Use the [AKS helper](https://azure.github.io/Aks-Construction) to provision your cluster, and configure the helper as follows:
 
-Then, go into the __Addon Details__ tab, and select the following options, providing all the require information
+Keep the default options for:
+  * __Operations Principles__: __"I want a managed environment"__
+  * __Security Principles__: __"Cluster with additional security controls"__
+
+Now, to configure the TLS Ingress, go into the __Addon Details__ tab
+
+  In the section __Securely Expose your applications via Layer 7 HTTP(S) proxies__, select the following options, providing all the require information
+
   * __Create FQDN URLs for your applications using external-dns__
-  * __Automatically Issue Certificates for HTTPS using cert-manager (with Lets Encrypt - requires email)__
+  * __Automatically Issue Certificates for HTTPS using cert-manager__
 
 
-__NOTE:__ If you want to store your certs in KeyVault (recommended), please also select the follwo option from the __Addon Details__ tab:
-  * __Store Kubernetes Secrets in Azure Keyvault, using AKS Managed Identity__
+  __NOTE:__ In the section __CSI Secrets : Store Kubernetes Secrets in Azure Keyvault, using AKS Managed Identity__,  ensure the following option is selected: __Yes, provision a new Azure KeyVault & enable Secrets Store CSI Driver__.  Also, __Enable KeyVault Integration for TLS Certificates__ is selected, this will integrate Application Gateway access to KeyVault,  and 
 
 
-This will create the full environment with everything configured inclduing AKS Cluster with ACR, AGIC, cert-manager & external-dns.
-
-___NOTE___: Please relember to run the script on the __Post Configuration__ tag to complete the deployment.
-
-
+Now, under the __Deploy__ tab, execute the commands to provision your complete environment. __NOTE__: Once complete, please relember to run the script on the __Post Configuration__ tab to complete the deployment.
 
 
 ## Generate self signed PKCS12 backend cert
 
-__NOTE__: The CN you provide the certificate needs to match the Ingress annotation : "appgw.ingress.kubernetes.io/backend-hostname" currently ___"openjdk-demo-service"___
-
+>__NOTE__: The CN you provide the certificate needs to match the Ingress annotation : "appgw.ingress.kubernetes.io/backend-hostname" currently ___"openjdk-demo-service"___
 
 ```
 # Create a private key and public certificate 
@@ -46,14 +49,28 @@ openssl pkcs12 -export -in cacert.pem -inkey cakey.pem -out identity.pfx
 export KEY_STORE_PASSWD=<your pfx keystore password>
 ```
 
-__NOTE:__ If you are using the [CSI Secret Store Driver](https://docs.microsoft.com/en-us/azure/aks/csi-secrets-store-driver) addon, you can ensure the secret is stored in an [Azure KeyVault](https://azure.microsoft.com/en-gb/services/key-vault/). Create Your Secret like this:
 
-## Option (A) Using CSI Secret & KeyVault (recommended)
+## Upload the Cert to KeyVault, and allow access from Application Gateway and your Java app
 
-Add Secret and Certificate to the vault
+Set all required environment variables for the following commands:
 ```
-export KVNAME=kv-azk8s56xy
+export AKSRG=<resource group created by the template>
+export AKSNAME=<cluster name created by the template>
+export AGNAME=<application gateway name created by the template>
+export ACRNAME==<container registry name created by the template>
+export KVNAME=<KeyVault name created by the template>
+export DNSZONE=<Your dnsZone name>
+export KVTENANT=$(az account show --query tenantId -o tsv)
+```
 
+
+### Add Key store password Secret and Certificate to the vault
+
+
+>NOTE: You may need to add KeyVault __access policies__ to the user performing these steps, see [assign-access-policy-portal](https://docs.microsoft.com/en-us/azure/key-vault/general/assign-access-policy-portal)
+
+
+```
 ## Create Key store password in KeyVault as secret
 az keyvault secret set --name key-store-password --vault-name $KVNAME  --value=${KEY_STORE_PASSWD}
 
@@ -66,21 +83,13 @@ az keyvault certificate import --vault-name $KVNAME --name openjdk-demo-service 
 az keyvault secret set --vault-name $KVNAME  --name openjdk-demo-secret -e base64  --file ./identity.pfx
 ```
 
-Create a `SecretProvideClass` in AKS, to allow AKS to reference the values in the KeyVault
+### Create a `SecretProvideClass` in AKS, to allow AKS to reference the values in the KeyVault
 
 
 ```
 ## Get the identity created from the KeyVaultSecert Addon
-export AKSRG=xxx
-export AKSNAME=xxx
 export CSISECRET_CLIENTID=$(az aks show  --resource-group $AKSRG --name $AKSNAME --query addonProfiles.azureKeyvaultSecretsProvider.identity.clientId -o tsv)
-
-## Assign KV access to CSI Secret addon
-az keyvault  set-policy -n $KVNAME --secret-permissions  get list --certificate-permissions get list --spn $CSISECRET_CLIENTID
-
-
-## Get your tenantId
-export KVTENANT=$(az account show --query tenantId -o tsv)
+az aks get-credentials -g $AKSRG -n $AKSNAME
 
 echo "
 apiVersion: secrets-store.csi.x-k8s.io/v1alpha1
@@ -124,65 +133,16 @@ This step is required if your backend cert is not a CA-signed cert, or a CA know
 ```
 ## https://docs.microsoft.com/en-us/azure/application-gateway/key-vault-certs#how-integration-works
 
-export AGNAME=xxx
-export AGRG=xxx
-
-## https://docs.microsoft.com/en-us/azure/azure-resource-manager/templates/key-vault-parameter?tabs=azure-cli
-## Property to specify whether Azure Resource Manager is permitted to retrieve secrets from the key vault
-az keyvault update  --name $KVNAME --enabled-for-template-deployment true
-
-## Create AppGW Identity to access KeyVault & Assign perms
-az identity create --name id-${AGNAME}  --resource-group $AGRG
-
-## May need to wait a minute or so until the Ideneity is propergated
-az keyvault  set-policy -n $KVNAME --secret-permissions set delete get list --spn $(az identity show  --resource-group $AGRG --name id-${AGNAME} --query clientId -o tsv)
-
-## Assign Identity to AppGW
-az network application-gateway identity assign -g $AGRG --gateway-name $AGNAME --identity $(az identity show  --resource-group $AGRG --name id-${AGNAME} --query id -o tsv)
-
 ## Create Root Cert reference in AppGW
 az network application-gateway root-cert create \
      --gateway-name $AGNAME  \
-     --resource-group $AGRG \
+     --resource-group $AKSRG \
      --name openjdk-demo-service \
      --keyvault-secret $(az keyvault secret list-versions --vault-name $KVNAME -n openjdk-demo-service --query "[?attributes.enabled].id" -o tsv)
 ```
 
 
-## Option (B) Using Kubernetes Secrets
-
-Create Secret
-
-```
-kubectl create secret generic openjdk-demo-cert  --from-literal=key-store-password=${KEY_STORE_PASSWD} --from-file=identity.p12=./identity.p12
-```
-
-
-### Upload backend cert to AppGw
-
-This step is required if your backend cert is not a CA-signed cert, or a CA known to AppGw: https://azure.github.io/application-gateway-kubernetes-ingress/tutorials/tutorial.e2e-ssl/
-
-
-```
-openssl x509 -outform der -in cacert.pem -out cacert.crt
-
-
-applicationGatewayName=xxx
-resourceGroup=xxx
-az network application-gateway root-cert create \
-    --gateway-name $applicationGatewayName  \
-    --resource-group $resourceGroup \
-    --name backend-tls \
-    --cert-file cacert.crt
-```
-
-
-
 ## Build / Run Java App
-
-
-export ACRNAME=xxx
-
 
 ### Create Docker container
 
@@ -212,26 +172,26 @@ docker run -d \
   ${ACRNAME}.azurecr.io/openjdk-demo:0.0.1
 ```
 
-## Deploy to ACR & kubernetes
+## Upload container to ACR & Deploy to AKS
 
-  Upload to ACR
+### Upload to ACR
 
 ```
 az acr login -n  ${ACRNAME}
 docker push ${ACRNAME}.azurecr.io/openjdk-demo:0.0.1
 ```
 
-In the ```deployment.yml``` __or__ ```deployment-csi.yml``` (latter if using CSI Secrets) file replace the following values:
 
- * ```{{ACRNAME}}``` to your ACR name (ie ```myacr001```)
- * ```{{DNSZONE}}``` to ypur DNS zone (ie ```example.com```)
-
-
-Deploy to AKS
+### Deploy to AKS
 
 ```
- kubectl apply -f ./yourdeployment.yml
+sed -e "s|{{ACRNAME}}|${ACRNAME}|g" -e "s|{{DNSZONE}}|${DNSZONE}|g" -e "s|{{KVNAME}}|${KVNAME}|g" ./deployment-csi.yml | kubectl apply -f -
 ```  
 
-Then, after 3-4 minutes (while the dns and certificates are generated), your new webapp should be accessable on ```https://openjdk-demo.{{DNSZONE}}```
+Check your POD status is successfullly running
+```
+kubectl get pods
+```
+
+After 3-4 minutes (while the dns and certificates are generated), your new webapp should be accessable on ```https://openjdk-demo.{{DNSZONE}}```
 
