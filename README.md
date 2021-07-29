@@ -75,12 +75,7 @@ export KVTENANT=$(az account show --query tenantId -o tsv)
 az keyvault secret set --name key-store-password --vault-name $KVNAME  --value=${KEY_STORE_PASSWD}
 
 ## Import Cert into keyvault
-## Cannot mount as binary :( (objectEncoding only supported for objectType: secret)
-## https://github.com/Azure/secrets-store-csi-driver-provider-azure/issues/138#issuecomment-874909741
 az keyvault certificate import --vault-name $KVNAME --name openjdk-demo-service --password $KEY_STORE_PASSWD --file ./identity.pfx
-
-## Alternative, store as secret!
-az keyvault secret set --vault-name $KVNAME  --name openjdk-demo-secret -e base64  --file ./identity.pfx
 ```
 
 ### Create a `SecretProvideClass` in AKS, to allow AKS to reference the values in the KeyVault
@@ -116,7 +111,7 @@ spec:
           objectName: key-store-password
           objectType: secret 
         - |
-          objectName: openjdk-demo-secret
+          objectName: openjdk-demo-service
           objectAlias: identity.p12
           objectType: secret
           objectFormat: PFX
@@ -185,7 +180,10 @@ docker push ${ACRNAME}.azurecr.io/openjdk-demo:0.0.1
 ### Deploy to AKS
 
 ```
-sed -e "s|{{ACRNAME}}|${ACRNAME}|g" -e "s|{{DNSZONE}}|${DNSZONE}|g" -e "s|{{KVNAME}}|${KVNAME}|g" ./deployment-csi.yml | kubectl apply -f -
+# In using Private Ingress, set PRIVATEIP to "true", otherwise "false"
+export PRIVATEIP=false
+export CHALLENGE_TYPE=$( [[ $PRIVATEIP == "true" ]] && echo "dns01" || echo "http01" ) 
+sed -e "s|{{ACRNAME}}|${ACRNAME}|g" -e "s|{{DNSZONE}}|${DNSZONE}|g" -e "s|{{KVNAME}}|${KVNAME}|g" -e "s|{{PRIVATEIP}}|${PRIVATEIP}|g"  -e "s|{{CHALLENGE_TYPE}}|${CHALLENGE_TYPE}|g" ./deployment-csi.yml | kubectl apply -f -
 ```  
 
 Check your POD status is successfullly running
