@@ -57,7 +57,7 @@ Set all required environment variables for the following commands:
 export AKSRG=<resource group created by the template>
 export AKSNAME=<cluster name created by the template>
 export AGNAME=<application gateway name created by the template>
-export ACRNAME==<container registry name created by the template>
+export ACRNAME=<container registry name created by the template>
 export KVNAME=<KeyVault name created by the template>
 export DNSZONE=<Your dnsZone name>
 export KVTENANT=$(az account show --query tenantId -o tsv)
@@ -71,9 +71,6 @@ export KVTENANT=$(az account show --query tenantId -o tsv)
 
 
 ```
-## Create Key store password in KeyVault as secret
-az keyvault secret set --name key-store-password --vault-name $KVNAME  --value=${KEY_STORE_PASSWD}
-
 ## Import Cert into keyvault
 az keyvault certificate import --vault-name $KVNAME --name openjdk-demo-service --password $KEY_STORE_PASSWD --file ./identity.pfx
 ```
@@ -93,12 +90,6 @@ metadata:
   name: azure-${KVNAME}
 spec:
   provider: azure
-  secretObjects:
-  - secretName: openjdk-demo-cert
-    type: Opaque
-    data: 
-    - objectName: key-store-password
-      key: key-store-password
   parameters:
     usePodIdentity: \"false\"         # [OPTIONAL] if not provided, will default to "false"
     useVMManagedIdentity: \"true\"
@@ -107,9 +98,6 @@ spec:
     cloudName: \"\"                   # [OPTIONAL for Azure] if not provided, azure environment will default to AzurePublicCloud 
     objects:  |
       array:
-        - |
-          objectName: key-store-password
-          objectType: secret 
         - |
           objectName: openjdk-demo-service
           objectAlias: identity.p12

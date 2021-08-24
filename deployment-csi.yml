@@ -30,10 +30,7 @@ spec:
             - name: SSL_STORE
               value: "/cert/identity.p12"
             - name: KEY_STORE_PASSWD
-              valueFrom:
-                secretKeyRef:
-                  name: openjdk-demo-cert
-                  key: key-store-password
+              value: ""
           volumeMounts:
             - name: openjdk-demo-cert-mount
               mountPath: "/cert"
