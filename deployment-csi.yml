@@ -14,6 +14,13 @@ spec:
       labels:
         app: openjdk-demo
     spec:
+      volumes:
+        - name: openjdk-demo-cert-mount
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "azure-{{KVNAME}}"
       containers:
         - name: openjdk-demo
           image: {{ACRNAME}}.azurecr.io/openjdk-demo:0.0.1
@@ -23,10 +30,7 @@ spec:
             - name: SSL_STORE
               value: "/cert/identity.p12"
             - name: KEY_STORE_PASSWD
-              valueFrom:
-                secretKeyRef:
-                  name:  openjdk-demo-cert
-                  key: key-store-password
+              value: ""
           volumeMounts:
             - name: openjdk-demo-cert-mount
               mountPath: "/cert"
@@ -41,10 +45,6 @@ spec:
             limits:
               memory: "512Mi"
               cpu: "1"
-      volumes:
-        - name: openjdk-demo-cert-mount
-          secret:
-            secretName:  openjdk-demo-cert
 ---
 apiVersion: v1
 kind: Service
@@ -71,11 +71,12 @@ metadata:
     kubernetes.io/ingress.class: azure/application-gateway
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
     kubernetes.io/tls-acme: "true"
-    cert-manager.io/acme-challenge-type: http01
+    cert-manager.io/acme-challenge-type: "{{CHALLENGE_TYPE}}"
+    appgw.ingress.kubernetes.io/use-private-ip: "{{PRIVATEIP}}"
     appgw.ingress.kubernetes.io/ssl-redirect: "true"
     appgw.ingress.kubernetes.io/backend-protocol: "https"
     appgw.ingress.kubernetes.io/backend-hostname: "openjdk-demo-service"
-    appgw.ingress.kubernetes.io/appgw-trusted-root-certificate: "backend-tls"
+    appgw.ingress.kubernetes.io/appgw-trusted-root-certificate: "openjdk-demo-service"
 spec:
   tls:
     - hosts:

@@ -36,3 +36,6 @@ build/
 *.p12
 *.cert
 *.crt
+*.pfx
+my.yml
+
