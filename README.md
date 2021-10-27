@@ -51,10 +51,10 @@ export KVTENANT=$(az account show --query tenantId -o tsv)
 
 >__NOTE__: The CN you provide the certificate needs to match the Ingress annotation : "appgw.ingress.kubernetes.io/backend-hostname" currently ___"openjdk-demo-service"___
 
-
+```
 export COMMON_NAME=openjdk-demo-service 
 az keyvault certificate create --vault-name $KVNAME -n $COMMON_NAME -p "$(az keyvault certificate get-default-policy | sed -e s/CN=CLIGetDefaultPolicy/CN=${COMMON_NAME}/g )"
-
+```
 
 ### Create a `SecretProvideClass` in AKS, to allow AKS to reference the values in the KeyVault
 
