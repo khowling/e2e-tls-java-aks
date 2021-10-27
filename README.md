@@ -8,8 +8,8 @@ This example uses the Azure Kubernetes managed WAF ingress __Applicaiton Gateway
 The following instructions will walk you though
 
 1. Creating the AKS Cluster with ACR (Azure Container Registry), AGIC addon (Application Gateway Ingress Controller), CSI Secret addon, AKV (Azure KeyVault), cert-manager for frontend certificate generation & external-dns for public DNS.
-2. Generating a Self-signed backend certificate & uploading into a Kubernetes secret
-3. Compiling and running the App locally
+2. Generating a Self-signed backend certificate
+3. Compile and running the App locally
 4. Deploying the app to AKS
 
 ## Provisioning a cluster
@@ -34,22 +34,6 @@ Now, to configure the TLS Ingress, go into the __Addon Details__ tab
 Now, under the __Deploy__ tab, execute the commands to provision your complete environment. __NOTE__: Once complete, please relember to run the script on the __Post Configuration__ tab to complete the deployment.
 
 
-## Generate self signed PKCS12 backend cert
-
->__NOTE__: The CN you provide the certificate needs to match the Ingress annotation : "appgw.ingress.kubernetes.io/backend-hostname" currently ___"openjdk-demo-service"___
-
-```
-# Create a private key and public certificate 
-openssl req -newkey rsa:2048 -x509 -keyout cakey.pem -out cacert.pem -days 3650 
-
-# Create a JKS keystore
-openssl pkcs12 -export -in cacert.pem -inkey cakey.pem -out identity.pfx 
-
-# Record your key store passwd for the following commands:
-export KEY_STORE_PASSWD=<your pfx keystore password>
-```
-
-
 ## Upload the Cert to KeyVault, and allow access from Application Gateway and your Java app
 
 Set all required environment variables for the following commands:
@@ -63,17 +47,14 @@ export DNSZONE=<Your dnsZone name>
 export KVTENANT=$(az account show --query tenantId -o tsv)
 ```
 
+## Generate self signed Certificate
 
-### Add Key store password Secret and Certificate to the vault
-
-
->NOTE: You may need to add KeyVault __access policies__ to the user performing these steps, see [assign-access-policy-portal](https://docs.microsoft.com/en-us/azure/key-vault/general/assign-access-policy-portal)
+>__NOTE__: The CN you provide the certificate needs to match the Ingress annotation : "appgw.ingress.kubernetes.io/backend-hostname" currently ___"openjdk-demo-service"___
 
 
-```
-## Import Cert into keyvault
-az keyvault certificate import --vault-name $KVNAME --name openjdk-demo-service --password $KEY_STORE_PASSWD --file ./identity.pfx
-```
+export COMMON_NAME=openjdk-demo-service 
+az keyvault certificate create --vault-name $KVNAME -n $COMMON_NAME -p "$(az keyvault certificate get-default-policy | sed -e s/CN=CLIGetDefaultPolicy/CN=${COMMON_NAME}/g )"
+
 
 ### Create a `SecretProvideClass` in AKS, to allow AKS to reference the values in the KeyVault
 
@@ -81,7 +62,7 @@ az keyvault certificate import --vault-name $KVNAME --name openjdk-demo-service 
 ```
 ## Get the identity created from the KeyVaultSecert Addon
 export CSISECRET_CLIENTID=$(az aks show  --resource-group $AKSRG --name $AKSNAME --query addonProfiles.azureKeyvaultSecretsProvider.identity.clientId -o tsv)
-az aks get-credentials -g $AKSRG -n $AKSNAME
+
 
 echo "
 apiVersion: secrets-store.csi.x-k8s.io/v1alpha1
@@ -99,7 +80,7 @@ spec:
     objects:  |
       array:
         - |
-          objectName: openjdk-demo-service
+          objectName: ${COMMON_NAME}
           objectAlias: identity.p12
           objectType: secret
           objectFormat: PFX
@@ -120,8 +101,8 @@ This step is required if your backend cert is not a CA-signed cert, or a CA know
 az network application-gateway root-cert create \
      --gateway-name $AGNAME  \
      --resource-group $AKSRG \
-     --name openjdk-demo-service \
-     --keyvault-secret $(az keyvault secret list-versions --vault-name $KVNAME -n openjdk-demo-service --query "[?attributes.enabled].id" -o tsv)
+     --name $COMMON_NAME \
+     --keyvault-secret $(az keyvault secret list-versions --vault-name $KVNAME -n $COMMON_NAME --query "[?attributes.enabled].id" -o tsv)
 ```
 
 
@@ -139,9 +120,22 @@ SSL_ENABLED="false" mvn package
 docker build -t ${ACRNAME}.azurecr.io/openjdk-demo:0.0.1 .
 ```
 
-## Run container locally
+## Run container locally (OPTIONAL)
 
 When you use a bind mount, a file or directory on the host machine is mounted into a container. The file or directory is referenced by its absolute path on the host machine.
+
+### Generate self signed PKCS12 backend cert, for local testing only
+
+```
+# Create a private key and public certificate 
+openssl req -newkey rsa:2048 -x509 -keyout cakey.pem -out cacert.pem -days 3650 
+
+# Create a JKS keystore
+openssl pkcs12 -export -in cacert.pem -inkey cakey.pem -out identity.pfx 
+
+# Record your key store passwd for the following commands:
+export KEY_STORE_PASSWD=<your pfx keystore password>
+```
 
 ```
 docker run -d \
