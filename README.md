@@ -106,11 +106,8 @@ az network application-gateway root-cert create \
 ```
 
 
-## Build / Run Java App
+## Build Java App Container
 
-### Create Docker container
-
-Set ```ACRNAME``` to the container registry that was created by the wizzard
 
 ```
 ### Create a deployable jar file
@@ -120,36 +117,9 @@ SSL_ENABLED="false" mvn package
 docker build -t ${ACRNAME}.azurecr.io/openjdk-demo:0.0.1 .
 ```
 
-## Run container locally (OPTIONAL)
 
-When you use a bind mount, a file or directory on the host machine is mounted into a container. The file or directory is referenced by its absolute path on the host machine.
 
-### Generate self signed PKCS12 backend cert, for local testing only
-
-```
-# Create a private key and public certificate 
-openssl req -newkey rsa:2048 -x509 -keyout cakey.pem -out cacert.pem -days 3650 
-
-# Create a JKS keystore
-openssl pkcs12 -export -in cacert.pem -inkey cakey.pem -out identity.pfx 
-
-# Record your key store passwd for the following commands:
-export KEY_STORE_PASSWD=<your pfx keystore password>
-```
-
-```
-docker run -d \
-  -it \
-  -p 8080:8080 \
-  --env SSL_ENABLED="true" \
-  --env SSL_STORE=/cert/identity.p12 \
-  --env KEY_STORE_PASSWD=${KEY_STORE_PASSWD} \
-  --name openjdk-demo \
-  --mount type=bind,source="$(pwd)"/identity.p12,target=/cert/identity.p12,readonly  \
-  ${ACRNAME}.azurecr.io/openjdk-demo:0.0.1
-```
-
-## Upload container to ACR & Deploy to AKS
+## Upload Container to ACR & Deploy to AKS
 
 ### Upload to ACR
 
@@ -175,3 +145,36 @@ kubectl get pods
 
 After 3-4 minutes (while the dns and certificates are generated), your new webapp should be accessable on ```https://openjdk-demo.{{DNSZONE}}```
 
+
+
+
+## Run container locally (OPTIONAL)
+
+
+### Generate self signed PKCS12 backend cert, for local testing only
+
+```
+# Create a private key and public certificate 
+openssl req -newkey rsa:2048 -x509 -keyout cakey.pem -out cacert.pem -days 3650 
+
+# Create a JKS keystore
+openssl pkcs12 -export -in cacert.pem -inkey cakey.pem -out identity.pfx 
+
+# Record your key store passwd for the following commands:
+export KEY_STORE_PASSWD=<your pfx keystore password>
+```
+
+NOTE: When you use a bind mount, a file or directory on the host machine is mounted into a container. The file or directory is referenced by its absolute path on the host machine.
+
+
+```
+docker run -d \
+  -it \
+  -p 8080:8080 \
+  --env SSL_ENABLED="true" \
+  --env SSL_STORE=/cert/identity.p12 \
+  --env KEY_STORE_PASSWD=${KEY_STORE_PASSWD} \
+  --name openjdk-demo \
+  --mount type=bind,source="$(pwd)"/identity.p12,target=/cert/identity.p12,readonly  \
+  ${ACRNAME}.azurecr.io/openjdk-demo:0.0.1
+```
