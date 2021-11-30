@@ -4,6 +4,8 @@ nameOverride: "openjdk-demo"
 
 dnsname: openjdk-demo.local
 
+ingressType: "appgw"
+
 frontendCertificateSource: "letsEncrypt" #letsEncrypt|appGw
 
 appgw:

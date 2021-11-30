@@ -49,10 +49,10 @@ export KVTENANT=$(az account show --query tenantId -o tsv)
 
 ## Generate self signed Certificate
 
->__NOTE__: The CN you provide the certificate needs to match the Ingress annotation : "appgw.ingress.kubernetes.io/backend-hostname" currently ___"openjdk-demo-service"___
+>__NOTE__: The CN you provide the certificate needs to match the Ingress annotation : "appgw.ingress.kubernetes.io/backend-hostname" currently ___"openjdk-demoe"___
 
 ```
-export COMMON_NAME=openjdk-demo-service 
+export COMMON_NAME=openjdk-demo 
 az keyvault certificate create --vault-name $KVNAME -n $COMMON_NAME -p "$(az keyvault certificate get-default-policy | sed -e s/CN=CLIGetDefaultPolicy/CN=${COMMON_NAME}/g )"
 ```
 
